@@ -8,6 +8,10 @@ export default class DBInstance {
     this.db.loadDatabase();
   }
 
+  setAutoCompact(interval: number) {
+    this.db.persistence.setAutocompactionInterval(interval);
+  }
+
   create(key: string, value: any): Promise<undefined> {
     return new Promise((resolve, reject) => {
       this.db.insert(

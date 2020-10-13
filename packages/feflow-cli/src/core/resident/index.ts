@@ -8,6 +8,7 @@ import Table from 'easy-table';
 import DBInstance from './db';
 import {
   HEART_BEAT_COLLECTION,
+  UPDATE_COLLECTION,
   BEAT_GAP,
   CHECK_UPDATE_GAP
 } from '../../shared/constant';
@@ -18,7 +19,9 @@ const updateProcess = path.join(__dirname, './update');
 const isSilent = process.argv.slice(3).includes('--slient');
 const disableCheck = process.argv.slice(3).includes('--disable-check');
 let db: DBInstance;
+let heartDB: DBInstance;
 const table = new Table();
+const uTable = new Table();
 
 function startUpdateBeat(ctx: any) {
   const child = spawn(process.argv[0], [updateBeatProcess], {
@@ -96,22 +99,22 @@ async function _checkUpdateMsg(ctx: any, updateData: any = {}) {
     if (updatePkg) {
       updatePkg.forEach((pkg: any) => {
         const { name, localVersion, latestVersion } = pkg;
-        table.cell('Name', name);
-        table.cell(
+        uTable.cell('Name', name);
+        uTable.cell(
           'Version',
           localVersion === latestVersion
             ? localVersion
             : localVersion + ' -> ' + latestVersion
         );
-        table.cell('Tag', 'latest');
-        table.cell('Update', localVersion === latestVersion ? 'N' : 'Y');
-        table.newRow();
+        uTable.cell('Tag', 'latest');
+        uTable.cell('Update', localVersion === latestVersion ? 'N' : 'Y');
+        uTable.newRow();
       });
 
       ctx.logger.info(
         'Your local universal plugins has been updated last time.'
       );
-      if (!isSilent) console.log(table.toString());
+      if (!isSilent) console.log(uTable.toString());
 
       updateData['universal_plugins_update_msg'] = '';
     }
@@ -153,28 +156,32 @@ async function _checkLock(updateData: any) {
 }
 
 export async function checkUpdate(ctx: any) {
-  const dbFile = path.join(ctx.root, HEART_BEAT_COLLECTION);
+  const dbFile = path.join(ctx.root, UPDATE_COLLECTION);
   const autoUpdate =
     ctx.args['auto-update'] || String(ctx.config.autoUpdate) === 'true';
   const nowTime = new Date().getTime();
   let latestVersion: any = '';
   let cacheValidate: boolean = false;
+
   if (!db) {
     db = new DBInstance(dbFile);
+  }
+
+  const heartDBFile = path.join(ctx.root, HEART_BEAT_COLLECTION);
+  if (!heartDB) {
+    heartDB = new DBInstance(heartDBFile);
   }
 
   let updateData = await db.read('update_data');
   updateData = updateData?.['value'];
   if (updateData) {
-
-    await _checkUpdateMsg(ctx, updateData);
-
     // add lock to keep only one updating process is running
     const isLocked = await _checkLock(updateData);
     if (isLocked) return;
 
+    await _checkUpdateMsg(ctx, updateData);
 
-    const data = await db.read('beat_time');
+    const data = await heartDB.read('beat_time');
     if (data) {
       const lastBeatTime = parseInt(data['value'], 10);
 
@@ -194,7 +201,7 @@ export async function checkUpdate(ctx: any) {
     // init
     await Promise.all([
       // 初始化心跳数据
-      db.create('beat_time', String(nowTime)),
+      heartDB.create('beat_time', String(nowTime)),
       db.create('update_data', {
         // 初始化自动更新任务数据
         latest_cli_version: '',

@@ -13,9 +13,6 @@ import { getCurrentTag } from '../universal-pkg/repository/git';
 import loggerInstance from '../logger';
 import versionImpl from '../universal-pkg/dep/version';
 
-// 设置特殊的进程名字
-process.title = 'feflow-update-proccess';
-
 interface VersionObj {
   name: string;
   localVersion: any;

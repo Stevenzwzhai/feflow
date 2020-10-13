@@ -7,7 +7,7 @@ import osenv from 'osenv';
 import DBInstance from './db';
 import { install } from '../../shared/npm';
 import {
-  HEART_BEAT_COLLECTION,
+  UPDATE_COLLECTION,
   FEFLOW_ROOT,
   UNIVERSAL_PKG_JSON,
   UNIVERSAL_MODULES,
@@ -51,7 +51,7 @@ const universalModules = path.join(root, UNIVERSAL_MODULES);
 const config: any = parseYaml(configPath);
 const bin = path.join(root, FEFLOW_BIN);
 const lib = path.join(root, FEFLOW_LIB);
-const dbFile = path.join(root, HEART_BEAT_COLLECTION);
+const dbFile = path.join(root, UPDATE_COLLECTION);
 const universalPkg = new UniversalPkg(universalPkgPath);
 const db = new DBInstance(dbFile);
 
@@ -106,7 +106,7 @@ async function startPluginsUpdate(plugins: string[]) {
     needUpdatePlugins,
     false,
     true
-  ).then(async () => {
+  ).then(() => {
     updateData['plugins_update_msg'] = plugins;
     updateData['latest_plugins'] = '';
 

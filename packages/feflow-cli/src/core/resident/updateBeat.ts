@@ -4,12 +4,14 @@ import path from 'path';
 import semver from 'semver';
 import osenv from 'osenv';
 import spawn from 'cross-spawn';
+import _ from 'lodash';
 import DBInstance from './db';
 import packageJson from '../../shared/packageJson';
 import { parseYaml } from '../../shared/yaml';
 import { UniversalPkg } from '../universal-pkg/dep/pkg';
 import {
   HEART_BEAT_COLLECTION,
+  UPDATE_COLLECTION,
   BEAT_GAP,
   CHECK_UPDATE_GAP,
   FEFLOW_ROOT,
@@ -30,8 +32,11 @@ const { debug, silent } = process.env;
 const root = path.join(osenv.home(), FEFLOW_ROOT);
 const configPath = path.join(root, '.feflowrc.yml');
 const universalPkgPath = path.join(root, UNIVERSAL_PKG_JSON);
-const dbFile = path.join(root, HEART_BEAT_COLLECTION);
+const dbFile = path.join(root, UPDATE_COLLECTION);
 const db = new DBInstance(dbFile);
+const heartDBFile = path.join(root, HEART_BEAT_COLLECTION);
+const heartDB = new DBInstance(heartDBFile);
+heartDB.setAutoCompact(BEAT_GAP * 10000);
 const logger = loggerInstance({
   debug: Boolean(debug),
   silent: Boolean(silent)
@@ -41,7 +46,7 @@ const logger = loggerInstance({
 process.title = 'feflow-update-beat-proccess';
 
 const heartBeat = () => {
-  db.update('beat_time', String(new Date().getTime()));
+  heartDB.update('beat_time', String(new Date().getTime()));
 };
 
 const queryCliUpdate = async () => {
@@ -68,11 +73,13 @@ const queryCliUpdate = async () => {
   if (latestVersion && semver.gt(latestVersion, version)) {
     let updateData: any = await db.read('update_data');
     updateData = updateData?.['value'];
-    const newUpdateData = {
-      ...updateData,
-      latest_cli_version: latestVersion
-    };
-    await db.update('update_data', newUpdateData);
+    if (updateData.latest_cli_version !== latestVersion) {
+      const newUpdateData = {
+        ...updateData,
+        latest_cli_version: latestVersion
+      };
+      await db.update('update_data', newUpdateData);
+    }
   }
 };
 
@@ -116,11 +123,13 @@ const queryPluginsUpdate = async () => {
     if (plugins.length) {
       let updateData: any = await db.read('update_data');
       updateData = updateData?.['value'];
-      const newUpdateData = {
-        ...updateData,
-        latest_plugins: plugins
-      };
-      await db.update('update_data', newUpdateData);
+      if (!_.isEqual(updateData.latest_plugins, plugins)) {
+        const newUpdateData = {
+          ...updateData,
+          latest_plugins: plugins
+        };
+        await db.update('update_data', newUpdateData);
+      }
     }
   });
 };
@@ -152,11 +161,15 @@ const queryUniversalPluginsUpdate = async () => {
   if (latestUniversalPlugins.length) {
     let updateData: any = await db.read('update_data');
     updateData = updateData?.['value'];
-    const newUpdateData = {
-      ...updateData,
-      latest_universal_plugins: latestUniversalPlugins
-    };
-    await db.update('update_data', newUpdateData);
+    if (
+      !_.isEqual(updateData.latest_universal_plugins, latestUniversalPlugins)
+    ) {
+      const newUpdateData = {
+        ...updateData,
+        latest_universal_plugins: latestUniversalPlugins
+      };
+      await db.update('update_data', newUpdateData);
+    }
   }
 };
 
